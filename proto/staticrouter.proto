@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package staticrouter;
+
+option go_package = "github.com/wxdqing/plan/server/staticrouter/model;model";
+
+message RouteContext {
+  string kind = 1;
+  string node_type = 2;
+  int32 route_key = 3;
+}
+
+message RouteRecord {
+  string kind = 1;
+  string node_type = 2;
+  repeated int32 route_keys = 3;
+  int32 route_key_start = 4;
+  int32 route_key_end = 5;
+  string node_id = 6;
+  map<string, string> metadata = 7;
+}
+
+message RouteSnapshot {
+  int64 version = 1;
+  string scope = 2;
+  string checksum = 3;
+  repeated RouteRecord routes = 4;
+}
+
+enum RouteEventType {
+  ROUTE_EVENT_TYPE_UNSPECIFIED = 0;
+  ROUTE_EVENT_TYPE_REPLACE_ALL = 1;
+}
+
+message RouteEvent {
+  RouteEventType type = 1;
+  RouteSnapshot snapshot = 2;
+}
