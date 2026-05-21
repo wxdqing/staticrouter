@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	jsonformat "github.com/wxdqing/plan/server/staticrouter/formats/json"
-	xmlformat "github.com/wxdqing/plan/server/staticrouter/formats/xml"
-	"github.com/wxdqing/plan/server/staticrouter/source"
+	jsonformat "staticrouter/formats/json"
+	xmlformat "staticrouter/formats/xml"
+	"staticrouter/source"
 )
 
 type ConfigDocument = source.Document

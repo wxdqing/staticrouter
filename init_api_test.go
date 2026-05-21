@@ -6,8 +6,8 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 	goredis "github.com/redis/go-redis/v9"
-	"github.com/wxdqing/plan/server/staticrouter"
-	redisstore "github.com/wxdqing/plan/server/staticrouter/store/redis"
+	"staticrouter"
+	redisstore "staticrouter/store/redis"
 )
 
 func TestUpdateConfigPublishesAndRefreshesDefaultRouter(t *testing.T) {
@@ -135,5 +135,54 @@ func TestInitWithStore(t *testing.T) {
 	got, ok := staticrouter.GetRoute(&staticrouter.RouteContext{Kind: "player", NodeType: "game", RouteKey: 2001})
 	if !ok || got.GetNodeId() != "game-node-2" {
 		t.Fatalf("expected game-node-2 route")
+	}
+}
+
+func TestInitWithRedisInstance(t *testing.T) {
+	srv := miniredis.RunT(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	client := goredis.NewClient(&goredis.Options{Addr: srv.Addr()})
+	defer client.Close()
+
+	jsonContent := `{
+  "version": 23,
+  "scope": "qa",
+  "routes": [
+    {
+      "kinds": {
+        "kind": ["player"]
+      },
+      "nodes": {
+        "node": [
+          {
+            "node_id": "game-node-3",
+            "route_keys": {
+              "keys": {
+                "key": [3001]
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}`
+
+	if err := staticrouter.Init(
+		staticrouter.WithContext(ctx),
+		staticrouter.WithScope("qa"),
+		staticrouter.WithRedisInstance(client),
+	); err != nil {
+		t.Fatalf("init returned error: %v", err)
+	}
+	if err := staticrouter.UpdateConfig(staticrouter.ConfigModeJSON, []byte(jsonContent)); err != nil {
+		t.Fatalf("update config returned error: %v", err)
+	}
+
+	got, ok := staticrouter.GetRoute(&staticrouter.RouteContext{Kind: "player", NodeType: "game", RouteKey: 3001})
+	if !ok || got.GetNodeId() != "game-node-3" {
+		t.Fatalf("expected game-node-3 route")
 	}
 }

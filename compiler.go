@@ -2,7 +2,6 @@ package staticrouter
 
 import (
 	"errors"
-	"fmt"
 	"sort"
 )
 
@@ -10,22 +9,33 @@ var ErrRouteConflict = errors.New("staticrouter: route conflict")
 
 type runtimeTable struct {
 	version int64
-	exact   map[string]*RouteRecord
-	ranges  map[string][]*RouteRecord
+	exact   map[routeMapKey]*RouteRecord
+	ranges  map[routeGroupKey][]*RouteRecord
+}
+
+type routeMapKey struct {
+	kind     string
+	nodeType string
+	routeKey int32
+}
+
+type routeGroupKey struct {
+	kind     string
+	nodeType string
 }
 
 func compileSnapshot(snapshot *RouteSnapshot) (*runtimeTable, error) {
 	if snapshot == nil {
 		return &runtimeTable{
-			exact:  make(map[string]*RouteRecord),
-			ranges: make(map[string][]*RouteRecord),
+			exact:  make(map[routeMapKey]*RouteRecord),
+			ranges: make(map[routeGroupKey][]*RouteRecord),
 		}, nil
 	}
 
 	compiled := &runtimeTable{
 		version: snapshot.GetVersion(),
-		exact:   make(map[string]*RouteRecord),
-		ranges:  make(map[string][]*RouteRecord),
+		exact:   make(map[routeMapKey]*RouteRecord),
+		ranges:  make(map[routeGroupKey][]*RouteRecord),
 	}
 
 	for _, route := range snapshot.GetRoutes() {
@@ -36,18 +46,18 @@ func compileSnapshot(snapshot *RouteSnapshot) (*runtimeTable, error) {
 			return nil, err
 		}
 		for _, routeKey := range route.GetRouteKeys() {
-			key := routeMapKey(route.GetKind(), route.GetNodeType(), routeKey)
+			key := newRouteMapKey(route.GetKind(), route.GetNodeType(), routeKey)
 			if _, exists := compiled.exact[key]; exists {
 				return nil, ErrRouteConflict
 			}
-			for _, rangeRoute := range compiled.ranges[routeGroupKey(route.GetKind(), route.GetNodeType())] {
+			for _, rangeRoute := range compiled.ranges[newRouteGroupKey(route.GetKind(), route.GetNodeType())] {
 				if sameKindAndType(rangeRoute, route) &&
 					routeKey >= rangeRoute.GetRouteKeyStart() &&
 					routeKey <= rangeRoute.GetRouteKeyEnd() {
 					return nil, ErrRouteConflict
 				}
 			}
-			compiled.exact[key] = cloneRouteRecord(route)
+			compiled.exact[key] = route
 		}
 
 		if route.GetRouteKeyStart() != 0 || route.GetRouteKeyEnd() != 0 {
@@ -61,14 +71,14 @@ func compileSnapshot(snapshot *RouteSnapshot) (*runtimeTable, error) {
 					}
 				}
 			}
-			for _, existing := range compiled.ranges[routeGroupKey(route.GetKind(), route.GetNodeType())] {
+			for _, existing := range compiled.ranges[newRouteGroupKey(route.GetKind(), route.GetNodeType())] {
 				if route.GetRouteKeyStart() <= existing.GetRouteKeyEnd() &&
 					existing.GetRouteKeyStart() <= route.GetRouteKeyEnd() {
 					return nil, ErrRouteConflict
 				}
 			}
-			groupKey := routeGroupKey(route.GetKind(), route.GetNodeType())
-			compiled.ranges[groupKey] = append(compiled.ranges[groupKey], cloneRouteRecord(route))
+			groupKey := newRouteGroupKey(route.GetKind(), route.GetNodeType())
+			compiled.ranges[groupKey] = append(compiled.ranges[groupKey], route)
 		}
 	}
 
@@ -100,31 +110,10 @@ func sameKindAndType(a *RouteRecord, b *RouteRecord) bool {
 	return a.GetKind() == b.GetKind() && a.GetNodeType() == b.GetNodeType()
 }
 
-func cloneRouteRecord(route *RouteRecord) *RouteRecord {
-	if route == nil {
-		return nil
-	}
-	cloned := *route
-	if route.RouteKeys != nil {
-		cloned.RouteKeys = append([]int32(nil), route.RouteKeys...)
-	}
-	if route.Metadata != nil {
-		cloned.Metadata = make(map[string]string, len(route.Metadata))
-		for k, v := range route.Metadata {
-			cloned.Metadata[k] = v
-		}
-	}
-	return &cloned
+func newRouteMapKey(kind string, nodeType string, routeKey int32) routeMapKey {
+	return routeMapKey{kind: kind, nodeType: nodeType, routeKey: routeKey}
 }
 
-func routeMapKey(kind string, nodeType string, routeKey int32) string {
-	return kind + ":" + nodeType + ":" + itoa(routeKey)
-}
-
-func routeGroupKey(kind string, nodeType string) string {
-	return kind + ":" + nodeType
-}
-
-func itoa(v int32) string {
-	return fmt.Sprintf("%d", v)
+func newRouteGroupKey(kind string, nodeType string) routeGroupKey {
+	return routeGroupKey{kind: kind, nodeType: nodeType}
 }

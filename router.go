@@ -2,14 +2,18 @@ package staticrouter
 
 import (
 	"context"
+	"errors"
 	"sort"
 	"sync/atomic"
 )
 
+var ErrRouterAlreadyStarted = errors.New("staticrouter: router already started")
+
 type Router struct {
-	config Config
-	store  SnapshotStore
-	table  atomic.Pointer[runtimeTable]
+	config  Config
+	store   SnapshotStore
+	table   atomic.Pointer[runtimeTable]
+	started atomic.Bool
 }
 
 func NewRouter(s SnapshotStore) *Router {
@@ -21,7 +25,10 @@ func NewRouterWithConfig(cfg Config, s SnapshotStore) *Router {
 		config: cfg,
 		store:  s,
 	}
-	router.table.Store(&runtimeTable{exact: make(map[string]*RouteRecord)})
+	router.table.Store(&runtimeTable{
+		exact:  make(map[routeMapKey]*RouteRecord),
+		ranges: make(map[routeGroupKey][]*RouteRecord),
+	})
 	return router
 }
 
@@ -31,11 +38,11 @@ func (r *Router) Get(routeCtx *RouteContext) (*RouteRecord, bool) {
 		return nil, false
 	}
 
-	if route, ok := current.exact[routeMapKey(routeCtx.GetKind(), routeCtx.GetNodeType(), routeCtx.GetRouteKey())]; ok {
-		return cloneRouteRecord(route), true
+	if route, ok := current.exact[newRouteMapKey(routeCtx.GetKind(), routeCtx.GetNodeType(), routeCtx.GetRouteKey())]; ok {
+		return route, true
 	}
 
-	routes := current.ranges[routeGroupKey(routeCtx.GetKind(), routeCtx.GetNodeType())]
+	routes := current.ranges[newRouteGroupKey(routeCtx.GetKind(), routeCtx.GetNodeType())]
 	if len(routes) == 0 {
 		return nil, false
 	}
@@ -49,7 +56,7 @@ func (r *Router) Get(routeCtx *RouteContext) (*RouteRecord, bool) {
 	candidate := routes[idx-1]
 	if routeCtx.GetRouteKey() >= candidate.GetRouteKeyStart() &&
 		routeCtx.GetRouteKey() <= candidate.GetRouteKeyEnd() {
-		return cloneRouteRecord(candidate), true
+		return candidate, true
 	}
 	return nil, false
 }
@@ -84,16 +91,22 @@ func (r *Router) Start(ctx context.Context) error {
 	if r.store == nil {
 		return nil
 	}
+	if !r.started.CompareAndSwap(false, true) {
+		return ErrRouterAlreadyStarted
+	}
 	snapshot, err := r.store.GetSnapshot(ctx, r.config.Scope)
 	if err != nil {
+		r.started.Store(false)
 		return err
 	}
 	normalized, err := NormalizeSnapshot(snapshot)
 	if err != nil {
+		r.started.Store(false)
 		return err
 	}
 	compiled, err := compileSnapshot(normalized)
 	if err != nil {
+		r.started.Store(false)
 		return err
 	}
 	r.table.Store(compiled)

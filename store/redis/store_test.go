@@ -7,7 +7,7 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 	goredis "github.com/redis/go-redis/v9"
-	"github.com/wxdqing/plan/server/staticrouter/model"
+	"staticrouter/model"
 )
 
 func TestStoreReplaceAndGetSnapshot(t *testing.T) {
@@ -105,6 +105,39 @@ func TestStoreWatchReplaysStreamEvents(t *testing.T) {
 	}
 }
 
+func TestStoreWatchersDoNotShareCursor(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	srv := miniredis.RunT(t)
+
+	store := NewWithUniversalClient(goredis.NewUniversalClient(&goredis.UniversalOptions{
+		Addrs: []string{srv.Addr()},
+	}))
+
+	ch1, err := store.Watch(ctx, "qa")
+	if err != nil {
+		t.Fatalf("first watch returned error: %v", err)
+	}
+
+	if err := store.ReplaceSnapshot(ctx, &model.RouteSnapshot{
+		Version: 1,
+		Scope:   "qa",
+		Routes: []*model.RouteRecord{
+			{Kind: "player", NodeType: "game", RouteKeys: []int32{1}, NodeId: "node-a"},
+		},
+	}); err != nil {
+		t.Fatalf("replace snapshot returned error: %v", err)
+	}
+
+	expectSnapshotVersion(t, ch1, 1)
+
+	ch2, err := store.Watch(ctx, "qa")
+	if err != nil {
+		t.Fatalf("second watch returned error: %v", err)
+	}
+	expectSnapshotVersion(t, ch2, 1)
+}
+
 func TestStoreReplaceSnapshotRejectsVersionRollback(t *testing.T) {
 	ctx := context.Background()
 	srv := miniredis.RunT(t)
@@ -141,5 +174,24 @@ func TestStoreReplaceSnapshotRejectsVersionRollback(t *testing.T) {
 	}
 	if got.GetVersion() != 5 {
 		t.Fatalf("expected version 5 to remain, got %d", got.GetVersion())
+	}
+}
+
+func expectSnapshotVersion(t *testing.T, ch <-chan *model.RouteSnapshot, version int64) {
+	t.Helper()
+
+	deadline := time.After(2 * time.Second)
+	for {
+		select {
+		case snapshot, ok := <-ch:
+			if !ok {
+				t.Fatalf("watch channel closed before version %d", version)
+			}
+			if snapshot.GetVersion() == version {
+				return
+			}
+		case <-deadline:
+			t.Fatalf("expected snapshot version %d", version)
+		}
 	}
 }

@@ -77,6 +77,59 @@ func TestRouterRangeLookupUsesSortedRanges(t *testing.T) {
 	}
 }
 
+func TestRouterKeysAllowColonInKindAndNodeType(t *testing.T) {
+	router := NewRouter(nil)
+	if err := router.ReplaceAll(context.Background(), &RouteSnapshot{
+		Version: 1,
+		Routes: []*RouteRecord{
+			{Kind: "a:b", NodeType: "c", RouteKeys: []int32{1}, NodeId: "node-a"},
+			{Kind: "a", NodeType: "b:c", RouteKeys: []int32{1}, NodeId: "node-b"},
+		},
+	}); err != nil {
+		t.Fatalf("replace all returned error: %v", err)
+	}
+
+	got, ok := router.Get(&RouteContext{Kind: "a:b", NodeType: "c", RouteKey: 1})
+	if !ok || got.GetNodeId() != "node-a" {
+		t.Fatalf("expected node-a route")
+	}
+	got, ok = router.Get(&RouteContext{Kind: "a", NodeType: "b:c", RouteKey: 1})
+	if !ok || got.GetNodeId() != "node-b" {
+		t.Fatalf("expected node-b route")
+	}
+}
+
+func TestRouterGetReturnsRuntimeRecord(t *testing.T) {
+	router := NewRouter(nil)
+	if err := router.ReplaceAll(context.Background(), &RouteSnapshot{
+		Version: 1,
+		Routes: []*RouteRecord{
+			{
+				Kind:      "player",
+				NodeType:  "game",
+				RouteKeys: []int32{1001},
+				NodeId:    "node-a",
+				Metadata:  map[string]string{"zone": "a"},
+			},
+		},
+	}); err != nil {
+		t.Fatalf("replace all returned error: %v", err)
+	}
+
+	got, ok := router.Get(&RouteContext{Kind: "player", NodeType: "game", RouteKey: 1001})
+	if !ok {
+		t.Fatalf("expected route")
+	}
+
+	again, ok := router.Get(&RouteContext{Kind: "player", NodeType: "game", RouteKey: 1001})
+	if !ok {
+		t.Fatalf("expected route")
+	}
+	if got != again {
+		t.Fatalf("expected Get to return the runtime record without cloning")
+	}
+}
+
 func TestRouterRejectsSnapshotRollbackOnWatch(t *testing.T) {
 	ch := make(chan *RouteSnapshot, 2)
 	store := &stubStore{
@@ -110,6 +163,35 @@ func TestRouterRejectsSnapshotRollbackOnWatch(t *testing.T) {
 	got, ok := router.Get(&RouteContext{Kind: "player", NodeType: "game", RouteKey: 1})
 	if !ok || got.GetNodeId() != "node-v10" {
 		t.Fatalf("expected v10 snapshot to remain active")
+	}
+}
+
+func TestRouterStartRejectsSecondStart(t *testing.T) {
+	store := &stubStore{
+		getSnapshotFn: func(context.Context, string) (*RouteSnapshot, error) {
+			return &RouteSnapshot{
+				Version: 1,
+				Scope:   "qa",
+				Routes: []*RouteRecord{
+					{Kind: "player", NodeType: "game", RouteKeys: []int32{1}, NodeId: "node-v1"},
+				},
+			}, nil
+		},
+		watchFn: func(context.Context, string) (<-chan *RouteSnapshot, error) {
+			ch := make(chan *RouteSnapshot)
+			return ch, nil
+		},
+	}
+
+	router := NewRouterWithConfig(Config{Scope: "qa"}, store)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	if err := router.Start(ctx); err != nil {
+		t.Fatalf("first start returned error: %v", err)
+	}
+	if err := router.Start(ctx); err == nil {
+		t.Fatalf("expected second start to be rejected")
 	}
 }
 

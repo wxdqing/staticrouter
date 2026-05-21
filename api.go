@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	"github.com/wxdqing/plan/server/staticrouter/model"
-	redisstore "github.com/wxdqing/plan/server/staticrouter/store/redis"
+	goredis "github.com/redis/go-redis/v9"
+	"staticrouter/model"
+	redisstore "staticrouter/store/redis"
 )
 
 type RouteContext = model.RouteContext
@@ -44,6 +45,7 @@ type initOptions struct {
 	ctx          context.Context
 	scope        string
 	redisConfig  *RedisConfig
+	redisClient  goredis.UniversalClient
 	store        SnapshotStore
 	storeFactory func(RedisConfig) SnapshotStore
 }
@@ -69,6 +71,8 @@ func Init(opts ...Option) error {
 	switch {
 	case options.store != nil:
 		store = options.store
+	case options.redisClient != nil:
+		store = redisstore.NewWithUniversalClient(options.redisClient)
 	case options.redisConfig != nil:
 		if options.storeFactory != nil {
 			store = options.storeFactory(*options.redisConfig)
@@ -147,6 +151,16 @@ func WithScope(scope string) Option {
 func WithRedisConfig(cfg RedisConfig) Option {
 	return func(o *initOptions) error {
 		o.redisConfig = &cfg
+		return nil
+	}
+}
+
+func WithRedisInstance(client goredis.UniversalClient) Option {
+	return func(o *initOptions) error {
+		if client == nil {
+			return fmt.Errorf("staticrouter: redis instance is nil")
+		}
+		o.redisClient = client
 		return nil
 	}
 }

@@ -8,7 +8,7 @@ import (
 	goredis "github.com/redis/go-redis/v9"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/wxdqing/plan/server/staticrouter/model"
+	"staticrouter/model"
 )
 
 const (
@@ -39,8 +39,7 @@ return 1
 `)
 
 type Store struct {
-	client      goredis.UniversalClient
-	lastStreams map[string]string
+	client goredis.UniversalClient
 }
 
 func New(cfg Config) *Store {
@@ -49,8 +48,7 @@ func New(cfg Config) *Store {
 
 func NewWithUniversalClient(client goredis.UniversalClient) *Store {
 	return &Store{
-		client:      client,
-		lastStreams: make(map[string]string),
+		client: client,
 	}
 }
 
@@ -97,16 +95,12 @@ func (s *Store) Watch(ctx context.Context, scope string) (<-chan *model.RouteSna
 	out := make(chan *model.RouteSnapshot)
 	go func() {
 		defer close(out)
+		streamID := initialStreamID
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			default:
-			}
-
-			streamID := s.lastStreams[scope]
-			if streamID == "" {
-				streamID = initialStreamID
 			}
 
 			streams, err := s.client.XRead(ctx, &goredis.XReadArgs{
@@ -142,7 +136,7 @@ func (s *Store) Watch(ctx context.Context, scope string) (<-chan *model.RouteSna
 					if err := proto.Unmarshal([]byte(data), snapshot); err != nil {
 						continue
 					}
-					s.lastStreams[scope] = message.ID
+					streamID = message.ID
 					select {
 					case out <- snapshot:
 					case <-ctx.Done():

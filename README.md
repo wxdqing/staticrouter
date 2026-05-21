@@ -270,6 +270,8 @@ route, ok := staticrouter.GetRoute(&staticrouter.RouteContext{
 })
 ```
 
+`GetRoute` 返回的是本地 immutable route table 中的记录指针，调用方应按只读数据使用，不要修改返回的 `RouteRecord`。
+
 共享 protobuf 类型实际位于 `server/staticrouter/model` 包，主包保留了类型别名，方便业务侧继续使用 `staticrouter.RouteContext` / `staticrouter.RouteRecord`。
 
 ## Redis 存储模型
