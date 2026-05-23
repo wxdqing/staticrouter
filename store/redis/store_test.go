@@ -2,6 +2,7 @@ package redis
 
 import (
 	"context"
+	"net"
 	"testing"
 	"time"
 
@@ -9,6 +10,41 @@ import (
 	goredis "github.com/redis/go-redis/v9"
 	"staticrouter/model"
 )
+
+type recordEvalKeysHook struct {
+	keys []string
+}
+
+func (h *recordEvalKeysHook) DialHook(next goredis.DialHook) goredis.DialHook {
+	return func(ctx context.Context, network, addr string) (net.Conn, error) {
+		return next(ctx, network, addr)
+	}
+}
+
+func (h *recordEvalKeysHook) ProcessHook(next goredis.ProcessHook) goredis.ProcessHook {
+	return func(ctx context.Context, cmd goredis.Cmder) error {
+		args := cmd.Args()
+		if cmd.Name() == "eval" && len(args) >= 3 {
+			keyCount, ok := args[2].(int)
+			if ok {
+				h.keys = h.keys[:0]
+				for i := 0; i < keyCount; i++ {
+					key, ok := args[3+i].(string)
+					if ok {
+						h.keys = append(h.keys, key)
+					}
+				}
+			}
+		}
+		return next(ctx, cmd)
+	}
+}
+
+func (h *recordEvalKeysHook) ProcessPipelineHook(next goredis.ProcessPipelineHook) goredis.ProcessPipelineHook {
+	return func(ctx context.Context, cmds []goredis.Cmder) error {
+		return next(ctx, cmds)
+	}
+}
 
 func TestStoreReplaceAndGetSnapshot(t *testing.T) {
 	ctx := context.Background()
@@ -51,6 +87,41 @@ func TestStoreReplaceAndGetSnapshot(t *testing.T) {
 	}
 	if len(got.GetRoutes()) != 1 {
 		t.Fatalf("expected 1 route, got %d", len(got.GetRoutes()))
+	}
+}
+
+func TestStoreReplaceSnapshotPassesAllScriptKeysExplicitly(t *testing.T) {
+	ctx := context.Background()
+	srv := miniredis.RunT(t)
+	hook := &recordEvalKeysHook{}
+	client := goredis.NewUniversalClient(&goredis.UniversalOptions{
+		Addrs: []string{srv.Addr()},
+	})
+	client.AddHook(hook)
+	store := NewWithUniversalClient(client)
+
+	if err := store.ReplaceSnapshot(ctx, &model.RouteSnapshot{
+		Version: 1,
+		Scope:   "qa",
+		Routes: []*model.RouteRecord{
+			{Kind: "player", NodeType: "game", RouteKeys: []int32{1}, NodeId: "node-a"},
+		},
+	}); err != nil {
+		t.Fatalf("replace snapshot returned error: %v", err)
+	}
+
+	want := []string{
+		"staticrouter:snapshot:{qa}",
+		"staticrouter:events:{qa}",
+		"staticrouter:snapshot:{qa}:meta",
+	}
+	if len(hook.keys) != len(want) {
+		t.Fatalf("expected %d script keys, got %d: %v", len(want), len(hook.keys), hook.keys)
+	}
+	for i := range want {
+		if hook.keys[i] != want[i] {
+			t.Fatalf("expected script key %d to be %s, got %s", i, want[i], hook.keys[i])
+		}
 	}
 }
 

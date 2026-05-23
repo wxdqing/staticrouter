@@ -21,19 +21,20 @@ const (
 var replaceSnapshotScript = goredis.NewScript(`
 local snapshot_key = KEYS[1]
 local stream_key = KEYS[2]
+local meta_key = KEYS[3]
 local new_version = tonumber(ARGV[1])
 local new_data = ARGV[2]
 
 local current = redis.call("GET", snapshot_key)
 if current then
-  local current_version = tonumber(redis.call("HGET", snapshot_key .. ":meta", "version"))
+  local current_version = tonumber(redis.call("HGET", meta_key, "version"))
   if current_version and new_version < current_version then
     return 0
   end
 end
 
 redis.call("SET", snapshot_key, new_data)
-redis.call("HSET", snapshot_key .. ":meta", "version", tostring(new_version))
+redis.call("HSET", meta_key, "version", tostring(new_version))
 redis.call("XADD", stream_key, "*", "snapshot", new_data)
 return 1
 `)
@@ -78,7 +79,7 @@ func (s *Store) ReplaceSnapshot(ctx context.Context, snapshot *model.RouteSnapsh
 	}
 
 	result, err := replaceSnapshotScript.Run(ctx, s.client,
-		[]string{snapshotKey(snapshot.GetScope()), streamKey(snapshot.GetScope())},
+		[]string{snapshotKey(snapshot.GetScope()), streamKey(snapshot.GetScope()), snapshotMetaKey(snapshot.GetScope())},
 		snapshot.GetVersion(),
 		data,
 	).Int()
@@ -151,6 +152,10 @@ func (s *Store) Watch(ctx context.Context, scope string) (<-chan *model.RouteSna
 
 func snapshotKey(scope string) string {
 	return snapshotKeyPrefix + ":{" + scope + "}"
+}
+
+func snapshotMetaKey(scope string) string {
+	return snapshotKey(scope) + ":meta"
 }
 
 func streamKey(scope string) string {
