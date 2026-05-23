@@ -125,3 +125,51 @@ func TestPublisherPublishConfigFileJSON(t *testing.T) {
 		t.Fatalf("expected scope review, got %s", store.replaced.GetScope())
 	}
 }
+
+func TestPublisherPublishConfigContentJSON(t *testing.T) {
+	raw := []byte(`{
+  "version": 13,
+  "scope": "content",
+  "routes": [
+    {
+      "kinds": {
+        "kind": ["player"]
+      },
+      "nodes": {
+        "node": [
+          {
+            "node_id": "game-node-1",
+            "route_keys": {
+              "keys": {
+                "key": [1001]
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}`)
+
+	store := &publisherStubStore{}
+	publisher := NewPublisher(store)
+	if err := publisher.Publish(context.Background(), ConfigModeJSON, raw); err != nil {
+		t.Fatalf("publish returned error: %v", err)
+	}
+
+	if store.replaced == nil {
+		t.Fatalf("expected snapshot to be published")
+	}
+	if store.replaced.GetVersion() != 13 {
+		t.Fatalf("expected version 13, got %d", store.replaced.GetVersion())
+	}
+	if store.replaced.GetScope() != "content" {
+		t.Fatalf("expected scope content, got %s", store.replaced.GetScope())
+	}
+	if store.replaced.GetChecksum() == "" {
+		t.Fatalf("expected checksum to be present")
+	}
+	if len(store.replaced.GetRoutes()) != 1 {
+		t.Fatalf("expected 1 route, got %d", len(store.replaced.GetRoutes()))
+	}
+}
