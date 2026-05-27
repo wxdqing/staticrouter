@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"gitee.com/wxdqing/staticrouter/model"
 	"github.com/alicebob/miniredis/v2"
 	goredis "github.com/redis/go-redis/v9"
+	"github.com/wxdqing/staticrouter/model"
 )
 
 type recordEvalKeysHook struct {

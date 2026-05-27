@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"io"
 
-	"gitee.com/wxdqing/staticrouter/source"
+	"github.com/wxdqing/staticrouter/source"
 )
 
 type Loader struct{}

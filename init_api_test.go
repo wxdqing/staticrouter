@@ -4,10 +4,10 @@ import (
 	"context"
 	"testing"
 
-	"gitee.com/wxdqing/staticrouter"
-	redisstore "gitee.com/wxdqing/staticrouter/store/redis"
 	"github.com/alicebob/miniredis/v2"
 	goredis "github.com/redis/go-redis/v9"
+	"github.com/wxdqing/staticrouter"
+	redisstore "github.com/wxdqing/staticrouter/store/redis"
 )
 
 func TestUpdateConfigPublishesAndRefreshesDefaultRouter(t *testing.T) {

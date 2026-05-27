@@ -1,4 +1,4 @@
-module gitee.com/wxdqing/staticrouter
+module github.com/wxdqing/staticrouter
 
 go 1.26.0
 

@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"gitee.com/wxdqing/staticrouter"
-	redisstore "gitee.com/wxdqing/staticrouter/store/redis"
+	"github.com/wxdqing/staticrouter"
+	redisstore "github.com/wxdqing/staticrouter/store/redis"
 )
 
 func TestBDDGivenSnapshotInRedisWhenRouterStartsThenLookupUsesLocalMemory(t *testing.T) {

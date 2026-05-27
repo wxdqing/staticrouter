@@ -8,7 +8,7 @@ import (
 	goredis "github.com/redis/go-redis/v9"
 	"google.golang.org/protobuf/proto"
 
-	"gitee.com/wxdqing/staticrouter/model"
+	"github.com/wxdqing/staticrouter/model"
 )
 
 const (

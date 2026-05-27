@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	"gitee.com/wxdqing/staticrouter/model"
-	redisstore "gitee.com/wxdqing/staticrouter/store/redis"
 	goredis "github.com/redis/go-redis/v9"
+	"github.com/wxdqing/staticrouter/model"
+	redisstore "github.com/wxdqing/staticrouter/store/redis"
 )
 
 type RouteContext = model.RouteContext
