@@ -371,7 +371,7 @@ const file_staticrouter_proto_rawDesc = "" +
 	"\bsnapshot\x18\x02 \x01(\v2\x1b.staticrouter.RouteSnapshotR\bsnapshot*T\n" +
 	"\x0eRouteEventType\x12 \n" +
 	"\x1cROUTE_EVENT_TYPE_UNSPECIFIED\x10\x00\x12 \n" +
-	"\x1cROUTE_EVENT_TYPE_REPLACE_ALL\x10\x01B\x1aZ\x18staticrouter/model;modelb\x06proto3"
+	"\x1cROUTE_EVENT_TYPE_REPLACE_ALL\x10\x01B,Z*gitee.com/wxdqing/staticrouter/model;modelb\x06proto3"
 
 var (
 	file_staticrouter_proto_rawDescOnce sync.Once

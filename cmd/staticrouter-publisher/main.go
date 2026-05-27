@@ -7,8 +7,8 @@ import (
 	"os"
 	"time"
 
-	"staticrouter"
-	redisstore "staticrouter/store/redis"
+	"gitee.com/wxdqing/staticrouter"
+	redisstore "gitee.com/wxdqing/staticrouter/store/redis"
 )
 
 func main() {

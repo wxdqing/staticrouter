@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	jsonformat "staticrouter/formats/json"
-	xmlformat "staticrouter/formats/xml"
-	"staticrouter/source"
+	jsonformat "gitee.com/wxdqing/staticrouter/formats/json"
+	xmlformat "gitee.com/wxdqing/staticrouter/formats/xml"
+	"gitee.com/wxdqing/staticrouter/source"
 )
 
 type ConfigDocument = source.Document
