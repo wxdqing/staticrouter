@@ -9,6 +9,7 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	goredis "github.com/redis/go-redis/v9"
 	"github.com/wxdqing/staticrouter/model"
+	"github.com/wxdqing/staticrouter/rediskeys"
 )
 
 type recordEvalKeysHook struct {
@@ -87,6 +88,33 @@ func TestStoreReplaceAndGetSnapshot(t *testing.T) {
 	}
 	if len(got.GetRoutes()) != 1 {
 		t.Fatalf("expected 1 route, got %d", len(got.GetRoutes()))
+	}
+}
+
+func TestReplaceSnapshotUsesCanonicalRedisKeys(t *testing.T) {
+	ctx := context.Background()
+	srv := miniredis.RunT(t)
+	store := NewWithUniversalClient(goredis.NewUniversalClient(&goredis.UniversalOptions{
+		Addrs: []string{srv.Addr()},
+	}))
+
+	if err := store.ReplaceSnapshot(ctx, &model.RouteSnapshot{
+		Version: 1,
+		Scope:   "dev",
+		Routes: []*model.RouteRecord{
+			{Kind: "player", NodeType: "game", RouteKeys: []int32{1001}, NodeId: "game-node-1"},
+		},
+	}); err != nil {
+		t.Fatalf("replace snapshot: %v", err)
+	}
+
+	for _, key := range rediskeys.RuntimeKeysForScope("dev") {
+		if !srv.Exists(key) {
+			t.Fatalf("expected runtime key %q to exist", key)
+		}
+	}
+	if srv.Exists(rediskeys.AdminTableKey("dev")) {
+		t.Fatalf("runtime publish must not create admin cache key")
 	}
 }
 

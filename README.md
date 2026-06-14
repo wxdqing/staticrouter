@@ -201,6 +201,42 @@ message RouteSnapshot {
 - `prod` 节点只看 `prod` 的 routers
 - 不同归属的静态路由快照在 Redis 中相互隔离
 
+## Redis Key 规划（权威定义）
+
+所有 key 名称由 `rediskeys` 包统一导出（根包 `staticrouter` 亦 re-export 便捷函数），禁止在业务代码中硬编码字符串：
+
+```go
+import "github.com/wxdqing/staticrouter"
+
+staticrouter.SnapshotKey("dev")              // staticrouter:snapshot:{dev}
+staticrouter.SnapshotMetaKey("dev")        // staticrouter:snapshot:{dev}:meta
+staticrouter.EventsKey("dev")              // staticrouter:events:{dev}
+staticrouter.AdminTableKey("dev")          // staticrouter:admin:{dev}
+staticrouter.RuntimeRedisKeysForScope("dev") // 运行时三件套（不含 admin）
+```
+
+或直接引用子包：
+
+```go
+import "github.com/wxdqing/staticrouter/rediskeys"
+```
+
+`{scope}` 为 Redis Cluster hash-tag，同一 scope 的 key 落在同一 slot。
+
+| Key | 类型 | 写入方 | 值格式 | 用途 |
+|-----|------|--------|--------|------|
+| `staticrouter:snapshot:{scope}` | String | Publish | `RouteSnapshot` protobuf | 运行时路由整表 |
+| `staticrouter:snapshot:{scope}:meta` | Hash | Publish | `version` | 防版本回退 |
+| `staticrouter:events:{scope}` | Stream | Publish | field `snapshot` | gateway/game 热更新通知 |
+| `staticrouter:admin:{scope}` | String | dashboard Submit/Save | 外部 `RouteTable` protobuf | 管理端编辑缓存（含原始 JSON `content`） |
+
+说明：
+
+- **运行时**与**管理端**使用不同 key：提交只更新 `admin`，发布才写 `snapshot/events`。
+- `KeysForScope(scope)` 可列出某 scope 全部 key，便于运维清理。
+- `RuntimeKeysForScope(scope)` 仅含 gateway 运行时 key；dashboard purge `clear_runtime=true` 时删除这组 key。
+- 旧版 `dashboard:staticrouter:{scope}` 已废弃，请迁移到 `staticrouter:admin:{scope}`（PG 为主存，缓存 miss 会自动回填）。
+
 ## 发布流程
 
 推荐的发布流程：
@@ -217,6 +253,7 @@ message RouteSnapshot {
    - range/range overlap
 5. 发布到 Redis
    - SET staticrouter:snapshot:{scope}
+   - HSET staticrouter:snapshot:{scope}:meta version
    - XADD staticrouter:events:{scope}
 6. 各节点按自己的 `scope` watch stream
 7. 拉取/接收新 snapshot

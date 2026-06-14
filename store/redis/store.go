@@ -9,13 +9,12 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/wxdqing/staticrouter/model"
+	"github.com/wxdqing/staticrouter/rediskeys"
 )
 
 const (
-	snapshotKeyPrefix = "staticrouter:snapshot"
-	streamKeyPrefix   = "staticrouter:events"
-	consumerBlock     = 1000
-	initialStreamID   = "0-0"
+	consumerBlock   = 1000
+	initialStreamID = "0-0"
 )
 
 var replaceSnapshotScript = goredis.NewScript(`
@@ -54,7 +53,7 @@ func NewWithUniversalClient(client goredis.UniversalClient) *Store {
 }
 
 func (s *Store) GetSnapshot(ctx context.Context, scope string) (*model.RouteSnapshot, error) {
-	data, err := s.client.Get(ctx, snapshotKey(scope)).Bytes()
+	data, err := s.client.Get(ctx, rediskeys.SnapshotKey(scope)).Bytes()
 	if err != nil {
 		if errors.Is(err, goredis.Nil) {
 			return nil, nil
@@ -79,7 +78,11 @@ func (s *Store) ReplaceSnapshot(ctx context.Context, snapshot *model.RouteSnapsh
 	}
 
 	result, err := replaceSnapshotScript.Run(ctx, s.client,
-		[]string{snapshotKey(snapshot.GetScope()), streamKey(snapshot.GetScope()), snapshotMetaKey(snapshot.GetScope())},
+		[]string{
+			rediskeys.SnapshotKey(snapshot.GetScope()),
+			rediskeys.EventsKey(snapshot.GetScope()),
+			rediskeys.SnapshotMetaKey(snapshot.GetScope()),
+		},
 		snapshot.GetVersion(),
 		data,
 	).Int()
@@ -105,7 +108,7 @@ func (s *Store) Watch(ctx context.Context, scope string) (<-chan *model.RouteSna
 			}
 
 			streams, err := s.client.XRead(ctx, &goredis.XReadArgs{
-				Streams: []string{streamKey(scope), streamID},
+				Streams: []string{rediskeys.EventsKey(scope), streamID},
 				Block:   consumerBlock,
 				Count:   10,
 			}).Result()
@@ -150,14 +153,3 @@ func (s *Store) Watch(ctx context.Context, scope string) (<-chan *model.RouteSna
 	return out, nil
 }
 
-func snapshotKey(scope string) string {
-	return snapshotKeyPrefix + ":{" + scope + "}"
-}
-
-func snapshotMetaKey(scope string) string {
-	return snapshotKey(scope) + ":meta"
-}
-
-func streamKey(scope string) string {
-	return streamKeyPrefix + ":{" + scope + "}"
-}
