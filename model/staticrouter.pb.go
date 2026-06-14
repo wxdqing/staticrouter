@@ -136,6 +136,7 @@ type RouteRecord struct {
 	RouteKeyEnd   int32                  `protobuf:"varint,5,opt,name=route_key_end,json=routeKeyEnd,proto3" json:"route_key_end,omitempty"`
 	NodeId        string                 `protobuf:"bytes,6,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
 	Metadata      map[string]string      `protobuf:"bytes,7,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	RouteKeyField string                 `protobuf:"bytes,8,opt,name=route_key_field,json=routeKeyField,proto3" json:"route_key_field,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -217,6 +218,13 @@ func (x *RouteRecord) GetMetadata() map[string]string {
 		return x.Metadata
 	}
 	return nil
+}
+
+func (x *RouteRecord) GetRouteKeyField() string {
+	if x != nil {
+		return x.RouteKeyField
+	}
+	return ""
 }
 
 type RouteSnapshot struct {
@@ -347,7 +355,7 @@ const file_staticrouter_proto_rawDesc = "" +
 	"\fRouteContext\x12\x12\n" +
 	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x1b\n" +
 	"\tnode_type\x18\x02 \x01(\tR\bnodeType\x12\x1b\n" +
-	"\troute_key\x18\x03 \x01(\x05R\brouteKey\"\xc4\x02\n" +
+	"\troute_key\x18\x03 \x01(\x05R\brouteKey\"\xec\x02\n" +
 	"\vRouteRecord\x12\x12\n" +
 	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x1b\n" +
 	"\tnode_type\x18\x02 \x01(\tR\bnodeType\x12\x1d\n" +
@@ -356,7 +364,8 @@ const file_staticrouter_proto_rawDesc = "" +
 	"\x0froute_key_start\x18\x04 \x01(\x05R\rrouteKeyStart\x12\"\n" +
 	"\rroute_key_end\x18\x05 \x01(\x05R\vrouteKeyEnd\x12\x17\n" +
 	"\anode_id\x18\x06 \x01(\tR\x06nodeId\x12C\n" +
-	"\bmetadata\x18\a \x03(\v2'.staticrouter.RouteRecord.MetadataEntryR\bmetadata\x1a;\n" +
+	"\bmetadata\x18\a \x03(\v2'.staticrouter.RouteRecord.MetadataEntryR\bmetadata\x12&\n" +
+	"\x0froute_key_field\x18\b \x01(\tR\rrouteKeyField\x1a;\n" +
 	"\rMetadataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x8e\x01\n" +

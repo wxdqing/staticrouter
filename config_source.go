@@ -119,11 +119,16 @@ func routeToRouteRecords(route *ConfigRoute) ([]*RouteRecord, error) {
 	out := make([]*RouteRecord, 0, len(route.Kinds.Kinds)*len(route.Nodes.Nodes))
 	for _, kind := range route.Kinds.Kinds {
 		for _, node := range route.Nodes.Nodes {
+			nodeType := strings.TrimSpace(node.Type)
+			if nodeType == "" {
+				nodeType = "game"
+			}
 			record := &RouteRecord{
-				Kind:      kind,
-				NodeType:  "game",
-				RouteKeys: append([]int32(nil), node.RouteKeys.Keys.Keys...),
-				NodeId:    node.NodeID,
+				Kind:           kind,
+				NodeType:       nodeType,
+				RouteKeys:      append([]int32(nil), node.RouteKeys.Keys.Keys...),
+				NodeId:         node.NodeID,
+				RouteKeyField:  strings.TrimSpace(node.RouteKeys.Field),
 			}
 			if len(node.RouteKeys.Ranges.Ranges) > 1 {
 				return nil, fmt.Errorf("staticrouter: node %s has more than one range", node.NodeID)

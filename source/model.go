@@ -28,10 +28,12 @@ type Nodes struct {
 
 type Node struct {
 	NodeID    string    `xml:"node_id,attr" json:"node_id"`
+	Type      string    `xml:"type,attr" json:"type"`
 	RouteKeys RouteKeys `xml:"route_keys" json:"route_keys"`
 }
 
 type RouteKeys struct {
+	Field  string `xml:"field,attr" json:"field"`
 	Keys   Keys   `xml:"keys" json:"keys"`
 	Ranges Ranges `xml:"ranges" json:"ranges"`
 }

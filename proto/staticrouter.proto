@@ -18,6 +18,7 @@ message RouteRecord {
   int32 route_key_end = 5;
   string node_id = 6;
   map<string, string> metadata = 7;
+  string route_key_field = 8;
 }
 
 message RouteSnapshot {
